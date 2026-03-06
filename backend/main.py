@@ -79,7 +79,7 @@ def semantic_search(data: Question):
         query=data.query,
         chunks=stored_chunks,
         index=faiss_index,
-        top_k=5
+        top_k=2
     )
 
     return {
@@ -101,8 +101,12 @@ def rag_answer(data: Question):
         top_k=4
     )
 
+    # remove weak matches
+    retrieved_chunks = [c for c in retrieved_chunks if c["score"] > 0.35]
+
     if not retrieved_chunks:
-        return {"error": "No relevant context found"}
+       return {"error": "No strong match found in document"}
+
 
     # ---------------- STEP 1: REMOVE NOISE ----------------
     def is_noise(text: str) -> bool:
@@ -144,7 +148,7 @@ def rag_answer(data: Question):
     filtered_chunks = [
         chunk for score, chunk in scored_chunks
         if score > 0
-    ][:2]
+    ][:1]
 
     # fallback
     if not filtered_chunks:

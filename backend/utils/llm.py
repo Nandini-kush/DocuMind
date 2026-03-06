@@ -17,17 +17,18 @@ def generate_answer(question, context_chunks):
     context = "\n".join(context_chunks)
 
     prompt = f"""
-You are a strict question-answering assistant.
+You are a document question answering system.
 
-Answer the question using ONLY the information provided in the context below.
+Answer the question ONLY using the information in the context.
 
 Rules:
-- Do NOT include section numbers unless explicitly asked.
+- Extract only the relevant sentence.
 - Do NOT include unrelated topics.
-- Do NOT include institute names, exam names, or document metadata.
-- Be concise and precise.
-- If the answer is partially present, answer ONLY what is present.
-- If the answer is NOT present, say exactly:
+- Do NOT include section numbers unless asked.
+- Do NOT include institute names or document metadata.
+- Keep the answer short (maximum 2 sentences).
+
+If the answer is not present, say exactly:
 "The document does not contain this information."
 
 Context:
@@ -38,6 +39,7 @@ Question:
 
 Answer:
 """
+
 
     result = qa_pipeline(prompt)
 

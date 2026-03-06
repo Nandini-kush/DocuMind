@@ -8,7 +8,7 @@ def clean_text(text: str) -> str:
     text = " ".join(text.split())
     return text
 
-def chunk_text(text, chunk_size=400):
+def chunk_text(text, chunk_size=120, overlap=30):
     sentences = re.split(r'(?<=[.!?])\s+', text)
     chunks = []
     current_chunk = ""
