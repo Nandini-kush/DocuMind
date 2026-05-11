@@ -98,14 +98,25 @@ def rag_answer(data: Question):
         query=data.query,
         chunks=stored_chunks,
         index=faiss_index,
-        top_k=4
+        top_k=2
     )
 
+    # ---------------- DEBUG: Print Retrieved Chunks and Scores ----------------
+    print("\n[DEBUG] Retrieved Chunks and Scores:")
+    for i, chunk in enumerate(retrieved_chunks):
+        print(f"--- Chunk {i+1} (Score: {chunk.get('score', 0):.4f}) ---")
+        print(chunk["text"][:300] + ("..." if len(chunk["text"]) > 300 else ""))
+    print("\n")
+
     # remove weak matches
-    retrieved_chunks = [c for c in retrieved_chunks if c["score"] > 0.35]
+    retrieved_chunks = [c for c in retrieved_chunks if c.get("score", 0) >= 0.35]
 
     if not retrieved_chunks:
-       return {"error": "No strong match found in document"}
+       return {
+           "question": data.query,
+           "answer": "The document does not contain this information.",
+           "sources": []
+       }
 
 
     # ---------------- STEP 1: REMOVE NOISE ----------------
@@ -122,6 +133,10 @@ def rag_answer(data: Question):
         capital_ratio = sum(1 for w in words if w.isupper()) / len(words)
         if capital_ratio > 0.4:
             return True
+            
+        # Metadata or headers check
+        if text.isdigit() or sum(1 for c in text if c.isdigit()) / len(text) > 0.5:
+            return True
 
         return False
 
@@ -131,7 +146,11 @@ def rag_answer(data: Question):
     ]
 
     if not clean_chunks:
-        clean_chunks = retrieved_chunks
+       return {
+           "question": data.query,
+           "answer": "The document does not contain this information.",
+           "sources": []
+       }
 
     # ---------------- STEP 2: QUERY RELEVANCE FILTER ----------------
     query_words = set(data.query.lower().split())
@@ -144,22 +163,15 @@ def rag_answer(data: Question):
 
     scored_chunks.sort(key=lambda x: x[0], reverse=True)
 
-    # keep ONLY the most relevant chunks
+    # keep ONLY the single most relevant chunk
     filtered_chunks = [
         chunk for score, chunk in scored_chunks
         if score > 0
     ][:1]
 
-    # fallback
+    # fallback to highest vector score chunk if no keywords overlap
     if not filtered_chunks:
-        filtered_chunks = [chunk for _, chunk in scored_chunks[:2]]
-
-    # ---------------- DEBUG ----------------
-    print("\nRetrieved Chunks Sent to LLM:\n")
-    for i, chunk in enumerate(filtered_chunks):
-        print(f"--- Chunk {i+1} ---")
-        print(chunk["text"][:300])
-        print("\n")
+        filtered_chunks = [chunk for _, chunk in scored_chunks[:1]]
 
     # ---------------- LLM ----------------
     context_texts = [chunk["text"] for chunk in filtered_chunks]
@@ -168,6 +180,10 @@ def rag_answer(data: Question):
         question=data.query,
         context_chunks=context_texts
     )
+    
+    # Fallback Handling if answer is empty
+    if not answer.strip() or len(answer.strip()) < 5:
+        answer = "The document does not contain this information."
 
     return {
         "question": data.query,
